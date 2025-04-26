@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --iriq-light: #F6F8ED;
+  --iriq-primary: #7AD63D;
+  --iriq-dark: #002E1F;
+}
+
+body {
+  background-color: var(--iriq-light);
+  color: var(--iriq-dark);
+}
+
+@layer base {
+  body {
+    @apply antialiased;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-[#7AD63D] text-white px-4 py-2 rounded-md hover:bg-[#69c52c] transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-white text-[#002E1F] border border-[#002E1F] px-4 py-2 rounded-md hover:bg-[#F6F8ED] transition-colors;
+  }
+  
+  .card {
+    @apply bg-white rounded-xl shadow-md p-6;
+  }
+  
+  .input {
+    @apply border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-[#7AD63D] focus:border-transparent;
+  }
+}
