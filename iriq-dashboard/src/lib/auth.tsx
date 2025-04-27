@@ -65,28 +65,40 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     getSession()
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('Auth state changed:', event, session ? 'Session exists' : 'No session')
+        
         if (session?.user) {
-          // Fetch user profile data including role
-          const { data, error } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single()
+          console.log('User in session:', session.user.id, session.user.email)
+          
+          try {
+            // Fetch user profile data including role
+            console.log('Fetching profile for user:', session.user.id)
+            const { data, error } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', session.user.id)
+              .single()
 
-          if (error) {
-            console.error('Error fetching profile:', error)
+            if (error) {
+              console.error('Error fetching profile:', error)
+              setUser(null)
+              return
+            }
+
+            console.log('Profile fetched successfully:', data)
+            setUser({
+              id: session.user.id,
+              email: session.user.email!,
+              role: data.role,
+              full_name: data.full_name
+            })
+          } catch (err) {
+            console.error('Exception while fetching profile:', err)
             setUser(null)
-            return
           }
-
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            role: data.role,
-            full_name: data.full_name
-          })
         } else {
+          console.log('No user in session')
           setUser(null)
         }
         setIsLoading(false)
@@ -100,12 +112,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      console.log('Attempting to sign in with:', email)
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
+      
+      console.log('Sign in response:', data ? 'Success' : 'Failed', error ? error : 'No error')
+      
+      if (error) {
+        console.error('Sign in error:', error)
+      } else if (data.user) {
+        console.log('User signed in successfully:', data.user.id)
+      }
+      
       return { error }
     } catch (error) {
+      console.error('Exception during sign in:', error)
       return { error: error as Error }
     }
   }

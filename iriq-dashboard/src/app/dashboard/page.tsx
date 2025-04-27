@@ -1,8 +1,14 @@
 "use client"
 
+import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import Link from 'next/link'
 import { useAuth } from '@/lib/auth'
+import { supabase } from '@/lib/supabase'
+import MoistureMonitor from '@/components/dashboard/moisture-monitor'
+import PumpControl from '@/components/dashboard/pump-control'
+import HistoryView from '@/components/dashboard/history-view'
+import { Database } from '@/lib/database.types'
 
 // Icons
 const MoistureIcon = () => (
@@ -23,150 +29,255 @@ const HistoryIcon = () => (
   </svg>
 )
 
-const ProfileIcon = () => (
+const InfoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
   </svg>
 )
 
-const UsersIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-  </svg>
-)
-
-const ArrowRightIcon = () => (
-  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-  </svg>
-)
-
-type DashboardCardProps = {
+type WidgetWrapperProps = {
   title: string
-  description: string
   icon: React.ReactNode
-  href: string
+  children: React.ReactNode
   delay: number
-  adminOnly?: boolean
+  className?: string
+  fullHeight?: boolean
 }
 
-const DashboardCard = ({ title, description, icon, href, delay, adminOnly = false }: DashboardCardProps) => {
-  const { user } = useAuth()
-  const isAdmin = user?.role === 'admin'
-  
-  if (adminOnly && !isAdmin) return null
-  
+const WidgetWrapper = ({ title, icon, children, delay, className = '', fullHeight = false }: WidgetWrapperProps) => {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className="bg-white rounded-xl shadow-md overflow-hidden border border-[#F6F8ED] hover:shadow-lg transition-shadow duration-300"
+      className={`bg-white rounded-xl shadow-md overflow-hidden border border-[#F6F8ED] ${fullHeight ? 'h-full' : ''} ${className}`}
     >
-      <Link href={href} className="block">
-        <div className="p-6">
-          <div className="flex items-center mb-4">
-            <div className="w-12 h-12 rounded-full bg-[#7AD63D] bg-opacity-20 flex items-center justify-center mr-4 text-[#002E1F]">
-              {icon}
-            </div>
-            <h3 className="text-xl font-bold text-[#002E1F]">{title}</h3>
+      <div className="p-4 border-b border-[#F6F8ED]">
+        <div className="flex items-center">
+          <div className="w-8 h-8 rounded-full bg-[#7AD63D] bg-opacity-20 flex items-center justify-center mr-3 text-[#002E1F]">
+            {icon}
           </div>
-          <p className="text-gray-600 mb-6">{description}</p>
-          <div className="flex justify-end">
-            <motion.div
-              whileHover={{ x: 5 }}
-              className="flex items-center text-[#7AD63D] font-medium"
-            >
-              <span className="mr-2">View</span>
-              <ArrowRightIcon />
-            </motion.div>
-          </div>
+          <h3 className="text-lg font-bold text-[#002E1F]">{title}</h3>
         </div>
-      </Link>
+      </div>
+      <div className="p-4">
+        {children}
+      </div>
     </motion.div>
+  )
+}
+
+type SystemStatusProps = {
+  deviceStatus: Database['public']['Tables']['device_status']['Row'] | null
+  lastReading: Database['public']['Tables']['sensor_readings']['Row'] | null
+}
+
+const SystemStatus = ({ deviceStatus, lastReading }: SystemStatusProps) => {
+  if (!deviceStatus || !lastReading) {
+    return (
+      <div className="flex items-center justify-center h-32">
+        <div className="text-center">
+          <div className="w-8 h-8 mx-auto mb-2 border-t-2 border-[#7AD63D] border-solid rounded-full animate-spin"></div>
+          <p className="text-gray-500 text-sm">Loading status...</p>
+        </div>
+      </div>
+    )
+  }
+
+  const lastUpdated = new Date(lastReading.created_at).toLocaleString()
+  const pumpStatus = deviceStatus.pump_status ? 'Active' : 'Inactive'
+  const moistureLevel = lastReading.moisture_level
+  const moistureStatus = moistureLevel < 30 ? 'Low' : moistureLevel < 70 ? 'Optimal' : 'High'
+  const moistureColor = moistureLevel < 30 ? 'text-orange-500' : moistureLevel < 70 ? 'text-green-500' : 'text-blue-500'
+  const pumpColor = deviceStatus.pump_status ? 'text-green-500' : 'text-gray-500'
+  const operationMode = deviceStatus.operation_mode === 'auto' ? 'Automatic' : 'Manual'
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+        <span className="text-gray-600">Last Updated:</span>
+        <span className="text-gray-800 font-medium">{lastUpdated}</span>
+      </div>
+      
+      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+        <span className="text-gray-600">Moisture Level:</span>
+        <span className={`font-medium ${moistureColor}`}>{moistureLevel}% ({moistureStatus})</span>
+      </div>
+      
+      <div className="flex items-center justify-between pb-2 border-b border-gray-100">
+        <span className="text-gray-600">Pump Status:</span>
+        <span className={`font-medium ${pumpColor}`}>{pumpStatus}</span>
+      </div>
+      
+      <div className="flex items-center justify-between">
+        <span className="text-gray-600">Operation Mode:</span>
+        <span className="text-gray-800 font-medium">{operationMode}</span>
+      </div>
+    </div>
   )
 }
 
 export default function Dashboard() {
   const { user } = useAuth()
+  const [deviceStatus, setDeviceStatus] = useState<Database['public']['Tables']['device_status']['Row'] | null>(null)
+  const [lastReading, setLastReading] = useState<Database['public']['Tables']['sensor_readings']['Row'] | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  
+  useEffect(() => {
+    if (!user) return
+    
+    const fetchData = async () => {
+      setIsLoading(true)
+      // Fetch device status
+      const { data: statusData, error: statusError } = await supabase
+        .from('device_status')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single()
+      
+      if (statusError) {
+        console.error('Error fetching device status:', statusError)
+      }
+      
+      // Fetch latest sensor reading
+      const { data: readingData, error: readingError } = await supabase
+        .from('sensor_readings')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single()
+        
+      if (readingError) {
+        console.error('Error fetching moisture data:', readingError)
+      }
+      
+      setDeviceStatus(statusData)
+      setLastReading(readingData)
+      setIsLoading(false)
+    }
+    
+    fetchData()
+    
+    // Set up real-time subscription
+    
+    const statusSubscription = supabase
+      .channel('device_status_changes')
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'device_status',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        setDeviceStatus(payload.new as Database['public']['Tables']['device_status']['Row'])
+      })
+      .subscribe()
+    
+    const readingsSubscription = supabase
+      .channel('sensor_readings_changes')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'sensor_readings',
+        filter: `user_id=eq.${user.id}`
+      }, (payload) => {
+        setLastReading(payload.new as Database['public']['Tables']['sensor_readings']['Row'])
+      })
+      .subscribe()
+    
+    return () => {
+      statusSubscription.unsubscribe()
+      readingsSubscription.unsubscribe()
+    }
+  }, [user])
   
   if (!user) return null
   
   const firstName = user.full_name ? user.full_name.split(' ')[0] : 'there'
+  const isAdmin = user.role === 'admin'
   
   return (
     <div>
       <motion.div 
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="mb-8"
+        className="mb-6"
       >
         <h1 className="text-3xl font-bold text-[#002E1F] mb-2">Welcome, {firstName}!</h1>
         <p className="text-gray-600">
-          Monitor and control your IriQ Smart Irrigation system from this dashboard.
+          Here's your IriQ Smart Irrigation dashboard overview.
         </p>
       </motion.div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        <DashboardCard
-          title="Moisture Monitor"
-          description="View real-time soil moisture levels and status information."
-          icon={<MoistureIcon />}
-          href="/dashboard/moisture"
+      {/* Main Dashboard Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left Column - System Status */}
+        <WidgetWrapper
+          title="System Status"
+          icon={<InfoIcon />}
           delay={0.1}
-        />
+          className="lg:col-span-1"
+        >
+          <SystemStatus deviceStatus={deviceStatus} lastReading={lastReading} />
+        </WidgetWrapper>
         
-        <DashboardCard
-          title="Pump Control"
-          description="Control your irrigation pump and set operation modes."
-          icon={<PumpIcon />}
-          href="/dashboard/pump"
+        {/* Middle Column - Moisture Monitor */}
+        <WidgetWrapper
+          title="Moisture Monitor"
+          icon={<MoistureIcon />}
           delay={0.2}
-          adminOnly={true}
-        />
+          className="lg:col-span-2"
+          fullHeight
+        >
+          <div className="h-[300px]">
+            <MoistureMonitor compact />
+          </div>
+        </WidgetWrapper>
         
-        <DashboardCard
-          title="History View"
-          description="View historical moisture data and irrigation events."
+        {/* Admin Only: Pump Control */}
+        {isAdmin && (
+          <WidgetWrapper
+            title="Pump Control"
+            icon={<PumpIcon />}
+            delay={0.3}
+            className="lg:col-span-1"
+          >
+            <div className="h-[300px]">
+              <PumpControl compact />
+            </div>
+          </WidgetWrapper>
+        )}
+        
+        {/* History View */}
+        <WidgetWrapper
+          title="Recent History"
           icon={<HistoryIcon />}
-          href="/dashboard/history"
-          delay={0.3}
-        />
-        
-        <DashboardCard
-          title="User Profile"
-          description="Manage your personal information and account settings."
-          icon={<ProfileIcon />}
-          href="/dashboard/profile"
           delay={0.4}
-        />
-        
-        <DashboardCard
-          title="User Management"
-          description="Manage users and their access permissions."
-          icon={<UsersIcon />}
-          href="/dashboard/users"
-          delay={0.5}
-          adminOnly={true}
-        />
+          className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+        >
+          <div className="h-[300px]">
+            <HistoryView compact />
+          </div>
+        </WidgetWrapper>
       </div>
       
+      {/* Quick Tips */}
       <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.6 }}
-        className="mt-8 p-6 bg-[#F6F8ED] bg-opacity-50 rounded-xl"
+        className="mt-6 p-4 bg-[#F6F8ED] bg-opacity-50 rounded-xl"
       >
         <div className="flex items-start">
-          <div className="w-10 h-10 rounded-full bg-[#7AD63D] bg-opacity-30 flex items-center justify-center mr-4 text-[#002E1F]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+          <div className="w-8 h-8 rounded-full bg-[#7AD63D] bg-opacity-30 flex items-center justify-center mr-3 text-[#002E1F]">
+            <InfoIcon />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-[#002E1F] mb-2">Quick Tip</h3>
-            <p className="text-gray-700">
-              Use the sidebar navigation to quickly access different sections of your dashboard. Regular users can view moisture data and history, while administrators have additional control options.  
+            <h3 className="text-md font-semibold text-[#002E1F] mb-1">Quick Tip</h3>
+            <p className="text-gray-700 text-sm">
+              Use the navigation bar at the bottom to access detailed views of each section. All essential information is available at a glance on this dashboard.
             </p>
           </div>
         </div>

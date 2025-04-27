@@ -14,7 +14,7 @@ type MoistureData = {
   created_at: string
 }
 
-export default function MoistureMonitor() {
+export default function MoistureMonitor({ compact = false }: { compact?: boolean } = {}) {
   const [moistureData, setMoistureData] = useState<MoistureData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -102,6 +102,40 @@ export default function MoistureMonitor() {
   const statusColor = getMoistureStatusColor(moistureStatus)
   const lastUpdated = new Date(moistureData.created_at).toLocaleString()
 
+  // Render a compact version for the dashboard widget
+  if (compact) {
+    return (
+      <div className="h-full flex flex-col justify-center">
+        <div className="flex items-center justify-center mb-4">
+          <div className="w-32 h-32">
+            <CircularProgressbar
+              value={moistureData.moisture_percentage}
+              text={`${moistureData.moisture_percentage}%`}
+              styles={buildStyles({
+                textSize: '16px',
+                pathColor: statusColor,
+                textColor: '#002E1F',
+                trailColor: '#F6F8ED',
+              })}
+            />
+          </div>
+        </div>
+        <div className="text-center">
+          <motion.span 
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className={`inline-flex items-center px-3 py-1.5 rounded-full text-xs font-medium ${statusColor === '#7AD63D' ? 'bg-green-100 text-green-800' : statusColor === '#F59E0B' ? 'bg-yellow-100 text-yellow-800' : 'bg-red-100 text-red-800'}`}
+          >
+            {moistureStatus}
+          </motion.span>
+          <p className="text-xs text-gray-500 mt-2">Last updated: {lastUpdated}</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Full version
   return (
     <div className="space-y-8">
       {/* Overview Cards */}

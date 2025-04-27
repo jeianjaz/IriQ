@@ -27,7 +27,7 @@ type SensorReading = {
 
 type DateRange = '24h' | '7d' | '30d' | 'custom'
 
-export default function HistoryView() {
+export default function HistoryView({ compact = false }: { compact?: boolean } = {}) {
   const [readings, setReadings] = useState<SensorReading[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
