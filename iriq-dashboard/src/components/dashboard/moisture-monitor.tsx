@@ -27,11 +27,11 @@ export default function MoistureMonitor({ compact = false }: { compact?: boolean
       try {
         setLoading(true)
         
-        // Fetch the latest moisture reading for the user's device
+        // Fetch the latest moisture reading from the ESP32 device
         const { data, error } = await supabase
           .from('sensor_readings')
           .select('*')
-          .eq('device_id', user.id) // Assuming device_id is the same as user_id
+          .eq('device_id', 'esp32_device_1') // Use the ESP32 device ID
           .order('created_at', { ascending: false })
           .limit(1)
           .single()
@@ -49,7 +49,7 @@ export default function MoistureMonitor({ compact = false }: { compact?: boolean
 
     fetchMoistureData()
 
-    // Set up real-time subscription
+    // Set up real-time subscription for ESP32 device
     const subscription = supabase
       .channel('sensor_readings_changes')
       .on(
@@ -58,7 +58,7 @@ export default function MoistureMonitor({ compact = false }: { compact?: boolean
           event: 'INSERT',
           schema: 'public',
           table: 'sensor_readings',
-          filter: `device_id=eq.${user.id}`
+          filter: `device_id=eq.esp32_device_1`
         },
         (payload) => {
           // Update the state with the new reading

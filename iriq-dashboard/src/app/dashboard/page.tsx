@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import MoistureMonitor from '@/components/dashboard/moisture-monitor'
 import PumpControl from '@/components/dashboard/pump-control'
 import HistoryView from '@/components/dashboard/history-view'
+import { DeviceStatus } from '@/components/dashboard/device-status'
 import { Database } from '@/lib/database.types'
 
 // Icons
@@ -32,6 +33,12 @@ const HistoryIcon = () => (
 const InfoIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+)
+
+const DeviceIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
   </svg>
 )
 
@@ -75,28 +82,46 @@ type SystemStatusProps = {
 const SystemStatus = ({ deviceStatus, lastReading }: SystemStatusProps) => {
   if (!deviceStatus || !lastReading) {
     return (
-      <div className="flex items-center justify-center h-32">
-        <div className="text-center">
-          <div className="w-8 h-8 mx-auto mb-2 border-t-2 border-[#7AD63D] border-solid rounded-full animate-spin"></div>
-          <p className="text-gray-500 text-sm">Loading status...</p>
-        </div>
+      <div className="p-4 bg-gray-50 rounded-lg border border-gray-100 text-center">
+        <p className="text-gray-500">Loading system status...</p>
       </div>
     )
   }
-
-  const lastUpdated = new Date(lastReading.created_at).toLocaleString()
+  
+  // Calculate moisture status
+  let moistureStatus = 'Normal'
+  let moistureColor = 'text-green-600'
+  // Use moisture_percentage if available, otherwise use moisture_level (for backward compatibility)
+  const moistureLevel = 'moisture_percentage' in lastReading 
+    ? lastReading.moisture_percentage 
+    : ('moisture_level' in lastReading ? (lastReading as any).moisture_level : 0)
+  
+  if (moistureLevel < 20) {
+    moistureStatus = 'Very Dry'
+    moistureColor = 'text-red-600'
+  } else if (moistureLevel < 40) {
+    moistureStatus = 'Dry'
+    moistureColor = 'text-amber-600'
+  } else if (moistureLevel > 80) {
+    moistureStatus = 'Very Wet'
+    moistureColor = 'text-blue-600'
+  } else if (moistureLevel > 60) {
+    moistureStatus = 'Wet'
+    moistureColor = 'text-blue-500'
+  }
+  
+  // Pump status
   const pumpStatus = deviceStatus.pump_status ? 'Active' : 'Inactive'
-  const moistureLevel = lastReading.moisture_level
-  const moistureStatus = moistureLevel < 30 ? 'Low' : moistureLevel < 70 ? 'Optimal' : 'High'
-  const moistureColor = moistureLevel < 30 ? 'text-orange-500' : moistureLevel < 70 ? 'text-green-500' : 'text-blue-500'
-  const pumpColor = deviceStatus.pump_status ? 'text-green-500' : 'text-gray-500'
-  const operationMode = deviceStatus.operation_mode === 'auto' ? 'Automatic' : 'Manual'
+  const pumpColor = deviceStatus.pump_status ? 'text-green-600' : 'text-gray-600'
+  
+  // Operation mode
+  const operationMode = deviceStatus.automatic_mode ? 'Automatic' : 'Manual'
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between pb-2 border-b border-gray-100">
         <span className="text-gray-600">Last Updated:</span>
-        <span className="text-gray-800 font-medium">{lastUpdated}</span>
+        <span className="text-gray-800 font-medium">{new Date(lastReading.created_at).toLocaleString()}</span>
       </div>
       
       <div className="flex items-center justify-between pb-2 border-b border-gray-100">
@@ -128,11 +153,11 @@ export default function Dashboard() {
     
     const fetchData = async () => {
       setIsLoading(true)
-      // Fetch device status
+      // Fetch device status for ESP32 device
       const { data: statusData, error: statusError } = await supabase
         .from('device_status')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('device_id', 'esp32_device_1')
         .order('updated_at', { ascending: false })
         .limit(1)
         .single()
@@ -141,12 +166,12 @@ export default function Dashboard() {
         console.error('Error fetching device status:', statusError)
       }
       
-      // Fetch latest sensor reading
+      // Fetch latest sensor reading from ESP32 device
       const { data: readingData, error: readingError } = await supabase
         .from('sensor_readings')
         .select('*')
-        .eq('user_id', user.id)
-        .order('updated_at', { ascending: false })
+        .eq('device_id', 'esp32_device_1')
+        .order('created_at', { ascending: false })
         .limit(1)
         .single()
         
@@ -169,7 +194,7 @@ export default function Dashboard() {
         event: '*', 
         schema: 'public', 
         table: 'device_status',
-        filter: `user_id=eq.${user.id}`
+        filter: `device_id=eq.esp32_device_1`
       }, (payload) => {
         setDeviceStatus(payload.new as Database['public']['Tables']['device_status']['Row'])
       })
@@ -181,7 +206,7 @@ export default function Dashboard() {
         event: 'INSERT', 
         schema: 'public', 
         table: 'sensor_readings',
-        filter: `user_id=eq.${user.id}`
+        filter: `device_id=eq.esp32_device_1`
       }, (payload) => {
         setLastReading(payload.new as Database['public']['Tables']['sensor_readings']['Row'])
       })
@@ -236,12 +261,24 @@ export default function Dashboard() {
           </div>
         </WidgetWrapper>
         
+        {/* Device Status */}
+        <WidgetWrapper
+          title="Device Status"
+          icon={<DeviceIcon />}
+          delay={0.3}
+          className="lg:col-span-1"
+        >
+          <div className="h-[300px]">
+            <DeviceStatus compact />
+          </div>
+        </WidgetWrapper>
+        
         {/* Admin Only: Pump Control */}
         {isAdmin && (
           <WidgetWrapper
             title="Pump Control"
             icon={<PumpIcon />}
-            delay={0.3}
+            delay={0.4}
             className="lg:col-span-1"
           >
             <div className="h-[300px]">
@@ -254,8 +291,8 @@ export default function Dashboard() {
         <WidgetWrapper
           title="Recent History"
           icon={<HistoryIcon />}
-          delay={0.4}
-          className={`${isAdmin ? 'lg:col-span-2' : 'lg:col-span-3'}`}
+          delay={0.5}
+          className={`${isAdmin ? 'lg:col-span-1' : 'lg:col-span-2'}`}
         >
           <div className="h-[300px]">
             <HistoryView compact />

@@ -44,6 +44,12 @@ const UsersIcon = () => (
   </svg>
 )
 
+const DeviceIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+  </svg>
+)
+
 const LogoutIcon = () => (
   <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
@@ -74,8 +80,9 @@ const navigation: NavItem[] = [
   { name: 'Moisture Monitor', href: '/dashboard/moisture', icon: <MoistureIcon /> },
   { name: 'Pump Control', href: '/dashboard/pump', icon: <PumpIcon />, adminOnly: true },
   { name: 'History', href: '/dashboard/history', icon: <HistoryIcon /> },
+  { name: 'Devices', href: '/devices', icon: <DeviceIcon /> },
   { name: 'Profile', href: '/dashboard/profile', icon: <ProfileIcon /> },
-  { name: 'User Management', href: '/dashboard/users', icon: <UsersIcon />, adminOnly: true },
+  { name: 'Users', href: '/dashboard/users', icon: <UsersIcon />, adminOnly: true },
 ]
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {

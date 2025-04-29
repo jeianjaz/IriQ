@@ -18,17 +18,17 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
 
   useEffect(() => {
     if (!user) return
-
+ 
     const fetchDeviceStatus = async () => {
       try {
         setLoading(true)
         
-        // Fetch the current device status
+        // Fetch the current device status for the ESP32 device
         const { data, error } = await supabase
           .from('device_status')
           .select('*')
-          .eq('user_id', user.id)
-          .order('created_at', { ascending: false })
+          .eq('device_id', 'esp32_device_1')
+          .order('updated_at', { ascending: false })
           .limit(1)
           .single()
         
@@ -45,14 +45,14 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
 
     fetchDeviceStatus()
 
-    // Set up real-time subscription
+    // Set up real-time subscription for ESP32 device
     const statusSubscription = supabase
       .channel('device_status_changes')
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'device_status',
-        filter: `user_id=eq.${user.id}`
+        filter: `device_id=eq.esp32_device_1`
       }, (payload) => {
         setDeviceStatus(payload.new as DeviceStatus)
       })

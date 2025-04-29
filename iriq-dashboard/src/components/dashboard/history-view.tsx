@@ -46,7 +46,7 @@ export default function HistoryView({ compact = false }: { compact?: boolean } =
         let query = supabase
           .from('sensor_readings')
           .select('*')
-          .eq('device_id', user.id)
+          .eq('device_id', 'esp32_device_1')
           .order('created_at', { ascending: true })
         
         // Apply date filtering

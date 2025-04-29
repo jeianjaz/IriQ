@@ -2,11 +2,15 @@
 
 import Link from 'next/link'
 import Image from 'next/image'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 export default function Home() {
   const [activeSlide, setActiveSlide] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
+  const [currentWordIndex, setCurrentWordIndex] = useState(0)
+  const words = ['FARMING', 'CONTROL', 'SMART']
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [key, setKey] = useState(0) // For animation reset
 
   // Check if device is mobile
   useEffect(() => {
@@ -20,24 +24,98 @@ export default function Home() {
     return () => window.removeEventListener('resize', checkMobile)
   }, [])
 
+  // Word animation effect
+  useEffect(() => {
+    intervalRef.current = setInterval(() => {
+      setCurrentWordIndex(prevIndex => (prevIndex + 1) % words.length)
+      setKey(prev => prev + 1) // Reset animation
+    }, 3000) // Change word every 3 seconds
+    
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+      }
+    }
+  }, [])
+
   // Define slides
   const slides = [
     {
       id: 'home',
       title: 'Home',
       content: (
-        <div className="h-full flex flex-col justify-center items-center bg-white">
+        <div className="h-full flex flex-col justify-center items-center relative overflow-hidden">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-radial from-[#c8e8a8] via-[#e0f3d1] to-[#f0f9eb] animate-gradient-slow"></div>
+          
+          {/* Floating irrigation icons */}
+          <div className="absolute top-[15%] right-[20%] opacity-80 animate-bounce-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="absolute top-[15%] left-[20%] opacity-80 animate-pulse-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="absolute bottom-[20%] left-[15%] opacity-80 animate-spin-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="absolute bottom-[25%] right-[15%] opacity-80 animate-bounce-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="absolute top-[45%] right-[10%] opacity-80 animate-pulse-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+          </div>
+          
+          <div className="absolute top-[45%] left-[10%] opacity-80 animate-spin-slow transform-gpu">
+            <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+              </svg>
+            </div>
+          </div>
+          
           <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-full flex flex-col justify-center text-center">
             <div className="mx-auto max-w-4xl">
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight leading-tight">
-                <span className="text-[#002E1F]">Cultivating</span> 
-                <span className="text-[#002E1F]"> a </span>
-                <span className="text-[#7AD63D]">Greener Future</span>
+                <span className="text-[#002E1F]">Smart</span>
+                <span className="text-[#7AD63D] ml-3">Irrigation</span>
                 <br />
-                <span className="text-[#002E1F]">Through </span>
-                <span className="text-[#002E1F] italic">Sustainable</span>
+                <span className="text-[#002E1F]">for</span>
+                <span className="text-[#002E1F] italic ml-3">Modern Farming</span>
               </h1>
-              <h2 className="text-[#7AD63D] text-6xl md:text-7xl lg:text-8xl font-bold mt-4 tracking-wide">AGRICULTURE</h2>
+              <div className="mt-8 mb-4 perspective-[1000px] h-[80px] md:h-[100px] lg:h-[120px]">
+                <div className="bg-[#7AD63D] bg-opacity-10 rounded-lg py-3 px-6 inline-block transform-gpu">
+                  <h2 
+                    key={words[currentWordIndex]}
+                    className="text-[#7AD63D] text-5xl md:text-6xl lg:text-7xl font-bold tracking-wider animate-word-change"
+                  >
+                    {words[currentWordIndex]}
+                  </h2>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -47,7 +125,9 @@ export default function Home() {
       id: 'about',
       title: 'About Us',
       content: (
-        <div className="h-full flex flex-col justify-center items-center bg-white">
+        <div className="h-full flex flex-col justify-center items-center relative overflow-hidden">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-radial from-[#c8e8a8] via-[#e0f3d1] to-[#f0f9eb] animate-gradient-slow"></div>
           <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
             <h2 className="text-5xl md:text-6xl font-extrabold text-[#002E1F] mb-10 tracking-tight">OUR MISSION</h2>
             <div className="space-y-8">
@@ -68,7 +148,9 @@ export default function Home() {
       id: 'services',
       title: 'Services',
       content: (
-        <div className="h-full flex flex-col justify-center items-center bg-white">
+        <div className="h-full flex flex-col justify-center items-center relative overflow-hidden">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-radial from-[#c8e8a8] via-[#e0f3d1] to-[#f0f9eb] animate-gradient-slow"></div>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-4xl font-bold text-[#002E1F] mb-10 text-center">Our Services</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -110,7 +192,9 @@ export default function Home() {
       id: 'benefits',
       title: 'Benefits',
       content: (
-        <div className="h-full flex flex-col justify-center items-center bg-white">
+        <div className="h-full flex flex-col justify-center items-center relative overflow-hidden">
+          {/* Animated gradient background */}
+          <div className="absolute inset-0 bg-gradient-radial from-[#c8e8a8] via-[#e0f3d1] to-[#f0f9eb] animate-gradient-slow"></div>
           <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
             <h2 className="text-5xl md:text-6xl font-extrabold text-[#002E1F] mb-12 text-center tracking-tight">WHY CHOOSE IRIQ</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
@@ -184,6 +268,15 @@ export default function Home() {
   const goToNextSlide = () => {
     setActiveSlide((prev) => (prev === slides.length - 1 ? 0 : prev + 1))
   }
+
+  // Icons for the background
+  const FloatingIcon = ({ icon, className }: { icon: React.ReactNode, className: string }) => (
+    <div className={`absolute ${className} opacity-80 animate-float transform-gpu`}>
+      <div className="p-2 bg-white bg-opacity-30 rounded-full shadow-lg">
+        {icon}
+      </div>
+    </div>
+  )
 
   return (
     <main className={`h-screen flex flex-col ${isMobile ? 'overflow-auto' : 'overflow-hidden'}`}>
