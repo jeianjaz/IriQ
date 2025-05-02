@@ -17,14 +17,16 @@
 #include <WiFi.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
-#include <Preferences.h>
 #include <time.h>
+#include <Preferences.h>
 #include "config.h"
 #include "auth.h"
 #include "supabase_api.h"
 #include "sensors.h"
 #include "debug_test.h"
 #include "device_status_test.h"
+#include "diagnostics.h"
+#include "test_connection.h"
 
 // WiFi credentials - loaded from config.h
 const char* ssid = "JAZ 2.G";
@@ -52,29 +54,31 @@ unsigned long lastHeartbeatTime = 0;
 unsigned long lastSensorReadTime = 0;
 const unsigned long readingInterval = READING_INTERVAL;        // Read sensor every 1 minute
 const unsigned long commandCheckInterval = COMMAND_CHECK_INTERVAL; // Check for commands every 5 seconds
-const unsigned long heartbeatInterval = HEARTBEAT_INTERVAL;    // Send heartbeat every 5 minutes
+const unsigned long heartbeatInterval = 10000;    // Send heartbeat every 10 seconds (for better responsiveness)
 
 // Authentication and security
 
 void setup() {
   // Initialize serial communication
   Serial.begin(115200);
-  Serial.println("\n\nIriQ Smart Irrigation System - Starting up...");
-  Serial.println("Version: 1.0.0");
-  Serial.println("Build Date: " __DATE__ " " __TIME__);
+  delay(1000);
   
-  // Print configuration
-  Serial.println("\nConfiguration:");
-  Serial.print("Device ID: ");
-  Serial.println(deviceId);
-  Serial.print("Moisture Sensor Pin: ");
-  Serial.println(moistureSensorPin);
-  Serial.print("Pump Relay Pin: ");
-  Serial.println(pumpRelayPin);
-  Serial.print("LED Pin: ");
-  Serial.println(ledPin);
-  Serial.print("Moisture Threshold: ");
-  Serial.println(MOISTURE_THRESHOLD);
+  // Add a small delay for stability
+  delay(100);
+  
+  Serial.println();
+  Serial.println();
+  Serial.println("IriQ Smart Irrigation System - Starting up...");
+  Serial.println("Version: 1.0.0");
+  Serial.println("Build Date: " + String(__DATE__) + " " + String(__TIME__));
+  Serial.println();
+  
+  Serial.println("Configuration:");
+  Serial.println("Device ID: " + deviceId);
+  Serial.println("Moisture Sensor Pin: " + String(moistureSensorPin));
+  Serial.println("Pump Relay Pin: " + String(pumpRelayPin));
+  Serial.println("LED Pin: " + String(ledPin));
+  Serial.println("Moisture Threshold: " + String(MOISTURE_THRESHOLD));
   Serial.println();
   
   // Initialize pins
@@ -123,11 +127,15 @@ void setup() {
     Serial.println("Failed to update initial device status");
   }
   
-  // Run debug tests to diagnose Supabase integration issues
-  Serial.println("\n\n==== STARTING DEBUG TESTS ====\n");
+  // Run connection tests to verify Supabase communication
+  Serial.println("\n\n==== STARTING CONNECTION TESTS ====\n");
   delay(3000);  // Give system time to stabilize
-  Serial.println("Running debug tests for Supabase integration...");
+  Serial.println("Testing direct communication with Supabase...");
   
+  // Run the connection tests
+  runConnectionTests();
+  
+  // Run the original debug tests
   // Test sensor readings
   if (testSensorReadingsTable()) {
     Serial.println("\nSensor readings table test successful!\n");
@@ -150,10 +158,23 @@ void setup() {
   Serial.println("Setup complete! Starting main loop...");
 }
 
-// Global variable to track if we've run the direct test
+// Global variables to track if we've run the tests
 bool directTestRun = false;
+bool diagnosticsRun = false;
 
 void loop() {
+  // Add a small delay to stabilize the loop
+  delay(50);
+  
+  // Run diagnostics once after authentication
+  if (!diagnosticsRun && WiFi.status() == WL_CONNECTED && isAuthenticated()) {
+    Serial.println("\n\n==== RUNNING DIAGNOSTICS FROM LOOP ====\n");
+    runDiagnostics();
+    diagnosticsRun = true;
+    Serial.println("\n==== LOOP DIAGNOSTICS COMPLETE ====\n");
+    delay(2000);
+  }
+  
   // Run a direct test for sensor readings once
   if (!directTestRun && WiFi.status() == WL_CONNECTED && isAuthenticated()) {
     Serial.println("\n\n==== RUNNING DIRECT SENSOR READING TEST ====\n");
@@ -204,20 +225,63 @@ void loop() {
   
   // Check for commands at regular intervals
   if (millis() - lastCommandCheckTime >= COMMAND_CHECK_INTERVAL) {
-    Serial.println("Checking for control commands...");
+    Serial.println("\n==== Checking for control commands... ====");
+    Serial.print("Current pump status: ");
+    Serial.println(pumpStatus ? "ON" : "OFF");
+    Serial.print("Current mode: ");
+    Serial.println(automaticMode ? "AUTOMATIC" : "MANUAL");
     
     ControlCommand command = checkForCommands();
     
     if (command.valid) {
       Serial.println("Received valid command, executing...");
+      Serial.print("Command pump status: ");
+      Serial.println(command.pumpControl ? "ON" : "OFF");
+      Serial.print("Command mode: ");
+      Serial.println(command.automaticMode ? "AUTOMATIC" : "MANUAL");
       
       // Execute command
-      if (command.pumpControl != pumpStatus) {
-        setPumpStatus(command.pumpControl);
-      }
-      
+      // First handle mode changes, as they affect pump behavior
       if (command.automaticMode != automaticMode) {
+        Serial.print("Changing mode from ");
+        Serial.print(automaticMode ? "AUTOMATIC" : "MANUAL");
+        Serial.print(" to ");
+        Serial.println(command.automaticMode ? "AUTOMATIC" : "MANUAL");
+        
+        // Set the mode first
         setAutomaticMode(command.automaticMode);
+        
+        // If switching to automatic mode, immediately apply automatic logic
+        if (command.automaticMode) {
+          Serial.println("Applying automatic mode logic immediately");
+          handleAutomaticMode();
+          // Skip pump control command since automatic mode will handle it
+          Serial.println("Skipping manual pump control as automatic mode is now active");
+        } else {
+          // If switching to manual mode, apply the requested pump status
+          Serial.print("Switching to manual mode with pump ");
+          Serial.println(command.pumpControl ? "ON" : "OFF");
+          setPumpStatus(command.pumpControl);
+        }
+      } 
+      // Only handle pump control commands in manual mode
+      else if (!automaticMode) {
+        // Always apply pump control in manual mode, even if it appears to match current status
+        // This ensures the physical relay state matches the command
+        Serial.print("Manual mode: Setting pump to ");
+        Serial.println(command.pumpControl ? "ON" : "OFF");
+        
+        // Force the pump status to change with extra verification
+        setPumpStatus(command.pumpControl);
+        
+        // Double-check that the pump status was actually applied
+        delay(200); // Wait for relay to stabilize
+        if (pumpStatus != command.pumpControl) {
+          Serial.println("WARNING: Pump status doesn't match command! Trying again...");
+          setPumpStatus(command.pumpControl); // Try again
+        }
+      } else if (automaticMode) {
+        Serial.println("Ignoring pump control command in automatic mode");
       }
       
       // Mark command as executed
@@ -231,6 +295,7 @@ void loop() {
     }
     
     lastCommandCheckTime = millis();
+    Serial.println("==== Command check complete ====");
   }
   
   // Send heartbeat at regular intervals
@@ -319,6 +384,13 @@ void blinkLED(int times, int delayMs) {
 
 // Handle automatic mode logic
 void handleAutomaticMode() {
+  Serial.print("Automatic mode: Current moisture level: ");
+  Serial.print(moistureLevel);
+  Serial.print("%, Threshold: ");
+  Serial.print(MOISTURE_THRESHOLD);
+  Serial.print("%, Pump status: ");
+  Serial.println(pumpStatus ? "ON" : "OFF");
+  
   if (moistureLevel < MOISTURE_THRESHOLD && !pumpStatus) {
     // Soil is too dry and pump is off, turn it on
     setPumpStatus(true);
@@ -327,6 +399,13 @@ void handleAutomaticMode() {
     // Soil is wet enough and pump is on, turn it off
     setPumpStatus(false);
     Serial.println("Automatic mode: Soil wet enough, turning pump OFF");
+  } else if (moistureLevel >= MOISTURE_THRESHOLD) {
+    // Force pump off if moisture is above threshold, regardless of current state
+    // This ensures the pump is always off when moisture is sufficient
+    if (pumpStatus) {
+      setPumpStatus(false);
+      Serial.println("Automatic mode: Forcing pump OFF as moisture is sufficient");
+    }
   }
 }
 

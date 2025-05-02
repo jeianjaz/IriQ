@@ -5,6 +5,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth'
 import { Database } from '@/lib/database.types'
+import { Dialog } from '@/components/ui/dialog'
 
 type DeviceStatus = Database['public']['Tables']['device_status']['Row']
 
@@ -13,6 +14,11 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
   const [loading, setLoading] = useState(true)
   const [isUpdating, setIsUpdating] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [pendingAction, setPendingAction] = useState<{
+    type: 'pump' | 'mode',
+    value: boolean
+  } | null>(null)
   const { user } = useAuth()
   const isAdmin = user?.role === 'admin'
 
@@ -63,15 +69,25 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
     }
   }, [user])
 
+  const showPumpConfirmation = (newStatus: boolean) => {
+    if (!user || !deviceStatus || !isAdmin || deviceStatus.automatic_mode) return
+    
+    setPendingAction({
+      type: 'pump',
+      value: newStatus
+    })
+    setDialogOpen(true)
+  }
+  
   const togglePump = async () => {
-    if (!user || !deviceStatus || !isAdmin) return
+    if (!user || !deviceStatus || !isAdmin || !pendingAction || pendingAction.type !== 'pump') return
     
     try {
       setIsUpdating(true)
       setError(null)
       
       // Insert a new control command
-      const newStatus = !deviceStatus.pump_status
+      const newStatus = pendingAction.value
       const { error } = await supabase
         .from('control_commands')
         .insert({
@@ -95,18 +111,29 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
       setError('Failed to toggle pump status')
     } finally {
       setIsUpdating(false)
+      setPendingAction(null)
     }
   }
 
-  const toggleMode = async () => {
+  const showModeConfirmation = () => {
     if (!user || !deviceStatus || !isAdmin) return
+    
+    setPendingAction({
+      type: 'mode',
+      value: !deviceStatus.automatic_mode
+    })
+    setDialogOpen(true)
+  }
+  
+  const toggleMode = async () => {
+    if (!user || !deviceStatus || !isAdmin || !pendingAction || pendingAction.type !== 'mode') return
     
     try {
       setIsUpdating(true)
       setError(null)
       
       // Insert a new control command
-      const newMode = !deviceStatus.automatic_mode
+      const newMode = pendingAction.value
       const { error } = await supabase
         .from('control_commands')
         .insert({
@@ -130,6 +157,7 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
       setError('Failed to toggle automatic mode')
     } finally {
       setIsUpdating(false)
+      setPendingAction(null)
     }
   }
 
@@ -321,26 +349,40 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
           </div>
           
           <div className="flex flex-col space-y-4">
+            {deviceStatus.automatic_mode && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-2 text-sm text-yellow-700">
+                <div className="flex items-center mb-1">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-yellow-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="font-medium">Automatic Mode Active</span>
+                </div>
+                <p className="ml-7">Manual pump control is disabled. Switch to Manual Mode to control the pump directly.</p>
+              </div>
+            )}
+            
             <button
               className={`px-4 py-3 rounded-lg text-white font-medium transition-all ${
-                deviceStatus.pump_status 
+                deviceStatus.pump_status || deviceStatus.automatic_mode
                   ? 'bg-gray-200 text-gray-600 cursor-default' 
                   : 'bg-green-600 hover:bg-green-700 active:bg-green-800'
               }`}
-              onClick={() => !deviceStatus.pump_status && togglePump()}
-              disabled={deviceStatus.pump_status || isUpdating}
+              onClick={() => !deviceStatus.pump_status && !deviceStatus.automatic_mode && showPumpConfirmation(true)}
+              disabled={deviceStatus.pump_status || isUpdating || deviceStatus.automatic_mode}
+              title={deviceStatus.automatic_mode ? "Pump control is disabled in automatic mode" : ""}
             >
               Turn Pump ON
             </button>
             
             <button
               className={`px-4 py-3 rounded-lg text-white font-medium transition-all ${
-                !deviceStatus.pump_status 
+                !deviceStatus.pump_status || deviceStatus.automatic_mode
                   ? 'bg-gray-200 text-gray-600 cursor-default' 
                   : 'bg-red-600 hover:bg-red-700 active:bg-red-800'
               }`}
-              onClick={() => deviceStatus.pump_status && togglePump()}
-              disabled={!deviceStatus.pump_status || isUpdating}
+              onClick={() => deviceStatus.pump_status && !deviceStatus.automatic_mode && showPumpConfirmation(false)}
+              disabled={!deviceStatus.pump_status || isUpdating || deviceStatus.automatic_mode}
+              title={deviceStatus.automatic_mode ? "Pump control is disabled in automatic mode" : ""}
             >
               Turn Pump OFF
             </button>
@@ -379,7 +421,7 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
             
             <button
               className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white rounded-lg font-medium transition-all disabled:bg-gray-300 disabled:text-gray-500"
-              onClick={toggleMode}
+              onClick={showModeConfirmation}
               disabled={isUpdating}
             >
               Switch to {deviceStatus.automatic_mode ? 'MANUAL' : 'AUTOMATIC'} Mode
@@ -397,6 +439,27 @@ export default function PumpControl({ compact = false }: { compact?: boolean } =
           </div>
         </div>
       )}
+      
+      {/* Confirmation Dialog */}
+      <Dialog
+        isOpen={dialogOpen}
+        onClose={() => setDialogOpen(false)}
+        onConfirm={() => {
+          if (pendingAction?.type === 'pump') {
+            togglePump();
+          } else if (pendingAction?.type === 'mode') {
+            toggleMode();
+          }
+        }}
+        title={pendingAction?.type === 'pump' 
+          ? `Confirm Pump ${pendingAction.value ? 'Activation' : 'Deactivation'}` 
+          : `Switch to ${pendingAction?.value ? 'Automatic' : 'Manual'} Mode`}
+        message={pendingAction?.type === 'pump' 
+          ? `Are you sure you want to turn the irrigation pump ${pendingAction.value ? 'ON' : 'OFF'}?` 
+          : `Are you sure you want to switch to ${pendingAction?.value ? 'automatic' : 'manual'} mode? ${pendingAction?.value ? 'The system will control the pump based on soil moisture.' : 'You will have manual control of the pump.'}`}
+        confirmText={pendingAction?.type === 'pump' ? (pendingAction.value ? 'Turn ON' : 'Turn OFF') : 'Switch Mode'}
+        type={pendingAction?.type === 'pump' ? (pendingAction.value ? 'warning' : 'info') : 'info'}
+      />
       
       {/* Compact Admin Mode Toggle */}
       {compact && (

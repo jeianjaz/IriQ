@@ -237,64 +237,68 @@ export default function Dashboard() {
       </motion.div>
       
       {/* Main Dashboard Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - System Status */}
-        <WidgetWrapper
-          title="System Status"
-          icon={<InfoIcon />}
-          delay={0.1}
-          className="lg:col-span-1"
-        >
-          <SystemStatus deviceStatus={deviceStatus} lastReading={lastReading} />
-        </WidgetWrapper>
-        
-        {/* Middle Column - Moisture Monitor */}
-        <WidgetWrapper
-          title="Moisture Monitor"
-          icon={<MoistureIcon />}
-          delay={0.2}
-          className="lg:col-span-2"
-          fullHeight
-        >
-          <div className="h-[300px]">
-            <MoistureMonitor compact />
-          </div>
-        </WidgetWrapper>
-        
-        {/* Device Status */}
-        <WidgetWrapper
-          title="Device Status"
-          icon={<DeviceIcon />}
-          delay={0.3}
-          className="lg:col-span-1"
-        >
-          <div className="h-[300px]">
-            <DeviceStatus compact />
-          </div>
-        </WidgetWrapper>
-        
-        {/* Admin Only: Pump Control */}
-        {isAdmin && (
+      <div className="grid grid-cols-1 gap-6">
+        {/* Top Row - System Status with Device Status */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* System Status */}
           <WidgetWrapper
-            title="Pump Control"
-            icon={<PumpIcon />}
-            delay={0.4}
+            title="System Status"
+            icon={<InfoIcon />}
+            delay={0.1}
             className="lg:col-span-1"
           >
-            <div className="h-[300px]">
-              <PumpControl compact />
+            <div className="space-y-4">
+              <SystemStatus deviceStatus={deviceStatus} lastReading={lastReading} />
+              
+              {/* Device Status embedded in System Status */}
+              <div className="mt-4 pt-4 border-t border-[#F6F8ED]">
+                <div className="flex items-center mb-3">
+                  <div className="w-6 h-6 rounded-full bg-[#7AD63D] bg-opacity-20 flex items-center justify-center mr-2 text-[#002E1F]">
+                    <DeviceIcon />
+                  </div>
+                  <h4 className="text-md font-semibold text-[#002E1F]">Device Status</h4>
+                </div>
+                <DeviceStatus compact />
+              </div>
             </div>
           </WidgetWrapper>
-        )}
+          
+          {/* Pump Control */}
+          {isAdmin && (
+            <WidgetWrapper
+              title="Pump Control"
+              icon={<PumpIcon />}
+              delay={0.2}
+              className="lg:col-span-1"
+            >
+              <div className="h-[250px]">
+                <PumpControl compact />
+              </div>
+            </WidgetWrapper>
+          )}
+          
+          {/* Moisture Monitor */}
+          <WidgetWrapper
+            title="Moisture Monitor"
+            icon={<MoistureIcon />}
+            delay={0.3}
+            className={`${isAdmin ? 'lg:col-span-1' : 'lg:col-span-2'}`}
+          >
+            <div className="h-[250px]">
+              <MoistureMonitor compact />
+            </div>
+          </WidgetWrapper>
+        </div>
         
-        {/* History View */}
+        {/* Bottom Row - Full Width Moisture History Chart */}
         <WidgetWrapper
-          title="Recent History"
+          title="Moisture History"
           icon={<HistoryIcon />}
-          delay={0.5}
-          className={`${isAdmin ? 'lg:col-span-1' : 'lg:col-span-2'}`}
+          delay={0.4}
+          className="w-full"
+          fullHeight
         >
-          <div className="h-[300px]">
+          <div className="h-[450px]">
             <HistoryView compact />
           </div>
         </WidgetWrapper>

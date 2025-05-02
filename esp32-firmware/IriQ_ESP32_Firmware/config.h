@@ -26,8 +26,8 @@
 
 // Operational parameters
 #define MOISTURE_THRESHOLD 30   // Threshold for automatic irrigation (0-100, where 0 is dry)
-#define READING_INTERVAL 60000  // Read sensor every 1 minute (in milliseconds)
-#define COMMAND_CHECK_INTERVAL 5000  // Check for commands every 5 seconds
-#define HEARTBEAT_INTERVAL 300000    // Send heartbeat every 5 minutes
+#define READING_INTERVAL 3000   // Read sensor every 3 seconds for faster response
+#define COMMAND_CHECK_INTERVAL 1000  // Check for commands every 1 second for faster control
+#define HEARTBEAT_INTERVAL 3000     // Send heartbeat every 3 seconds for better dashboard responsiveness
 
 #endif // CONFIG_H

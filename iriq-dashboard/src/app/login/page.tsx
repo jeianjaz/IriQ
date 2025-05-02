@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/lib/auth'
+import { useNotification } from '@/lib/notification-context'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -12,7 +13,28 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { signIn } = useAuth()
+  const { showNotification } = useNotification()
+  
+  useEffect(() => {
+    // Check for query parameters that indicate a redirect with a message
+    const registered = searchParams.get('registered')
+    const verified = searchParams.get('verified')
+    const reset = searchParams.get('reset')
+    
+    if (registered === 'true') {
+      showNotification('success', 'Account created successfully! Please check your email to verify your account.')
+    }
+    
+    if (verified === 'true') {
+      showNotification('success', 'Email verified successfully! You can now log in.')
+    }
+    
+    if (reset === 'success') {
+      showNotification('success', 'Password reset successfully! You can now log in with your new password.')
+    }
+  }, [searchParams, showNotification])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()

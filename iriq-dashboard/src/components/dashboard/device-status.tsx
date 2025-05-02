@@ -19,6 +19,13 @@ interface Device {
   online: boolean;
 }
 
+interface DeviceHeartbeat {
+  id: string;
+  device_id: string;
+  last_seen: string;
+  status: string;
+}
+
 export function DeviceStatus({ compact = false }: DeviceStatusProps) {
   const { user } = useAuth();
   const [devices, setDevices] = useState<Device[]>([]);
@@ -111,7 +118,10 @@ export function DeviceStatus({ compact = false }: DeviceStatusProps) {
     // Fetch devices initially
     fetchDevices();
 
-    // Subscribe to device_heartbeats changes
+    // Get device IDs for subscriptions and polling
+    const deviceIds = devices.map(device => device.device_id);
+    
+    // Set up optimized real-time subscription for heartbeats
     const heartbeatSubscription = supabase
       .channel('device_heartbeats_changes')
       .on(
@@ -121,16 +131,23 @@ export function DeviceStatus({ compact = false }: DeviceStatusProps) {
           schema: 'public',
           table: 'device_heartbeats',
         },
-        () => {
-          // Refetch devices when heartbeats change
+        (payload) => {
+          console.log('Received heartbeat update:', payload.new);
+          // Refetch devices immediately when heartbeats change
           fetchDevices();
         }
       )
       .subscribe();
+      
+    // Add a polling fallback for reliability
+    const pollingInterval = setInterval(() => {
+      fetchDevices();
+    }, 5000); // Poll every 5 seconds as backup
 
-    // Cleanup subscription
+    // Cleanup subscription and polling
     return () => {
       supabase.removeChannel(heartbeatSubscription);
+      clearInterval(pollingInterval);
     };
   }, [user]);
 

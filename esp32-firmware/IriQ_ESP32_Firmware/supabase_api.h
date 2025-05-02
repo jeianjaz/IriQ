@@ -28,6 +28,7 @@ String getISOTime();
 // Function declarations
 bool sendSensorReading(int moistureLevel);
 bool updateDeviceStatus(bool pumpStatus, bool automaticMode);
+bool insertDeviceStatus(bool pumpStatus, bool automaticMode);
 ControlCommand checkForCommands();
 bool markCommandAsExecuted(String commandId);
 bool sendHeartbeat();

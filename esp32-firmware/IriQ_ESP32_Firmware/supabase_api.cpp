@@ -105,58 +105,99 @@ bool updateDeviceStatus(bool pumpStatus, bool automaticMode) {
   Serial.println("Updating device status in Supabase...");
   
   // Create JSON payload - match Supabase schema exactly
-  DynamicJsonDocument doc(1024);
+  DynamicJsonDocument doc(256);
   doc["device_id"] = deviceId;
   doc["pump_status"] = pumpStatus;
   doc["automatic_mode"] = automaticMode;
   doc["user_id"] = "2930efc2-0327-47db-9f0b-27901d2bc272";  // Admin user ID from the table structure
-  // Let Supabase handle the timestamp with its default value
   
   String jsonPayload;
   serializeJson(doc, jsonPayload);
   
-  // Try to create a new record first
+  Serial.print("Device status payload: ");
+  Serial.println(jsonPayload);
+  
+  // First try to update the existing record
   HTTPClient http;
-  String postUrl = String(supabaseUrl) + "/rest/v1/device_status";
-  http.begin(postUrl);
+  String patchUrl = String(supabaseUrl) + "/rest/v1/device_status?device_id=eq." + deviceId;
+  http.begin(patchUrl);
   http.addHeader("Content-Type", "application/json");
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + getAuthToken());
   http.addHeader("Prefer", "return=minimal");
   
-  int httpResponseCode = http.POST(jsonPayload);
-  bool success = false;
+  // Set timeout to prevent hanging
+  http.setTimeout(5000);
   
-  // If we get a 409 conflict error, use PATCH to update the existing record
-  if (httpResponseCode == 409) {
-    http.end();
-    
-    // Use PATCH to update the existing record
-    String patchUrl = String(supabaseUrl) + "/rest/v1/device_status?device_id=eq." + deviceId;
-    http.begin(patchUrl);
-    http.addHeader("Content-Type", "application/json");
-    http.addHeader("apikey", supabaseKey);
-    http.addHeader("Authorization", "Bearer " + getAuthToken());
-    http.addHeader("Prefer", "return=minimal");
-    
-    httpResponseCode = http.PATCH(jsonPayload);
-  }
+  int httpResponseCode = http.PATCH(jsonPayload);
+  bool success = false;
   
   if (httpResponseCode >= 200 && httpResponseCode < 300) {
     String response = http.getString();
     Serial.println("HTTP Response code: " + String(httpResponseCode));
     Serial.println("Response: " + response);
     success = true;
+    http.end();
+    return true;
   } else if (httpResponseCode == 401 || httpResponseCode == 403) {
     // Authentication error - try to refresh token
     Serial.println("Authentication error. Clearing token and will retry next time.");
     clearAuth();
+    http.end();
+    return false;
   } else {
     Serial.println("Error updating device status. HTTP Response code: " + String(httpResponseCode));
+    Serial.print("Error response: ");
+    Serial.println(http.getString());
+    http.end();
+    
+    // If update fails, try to create a new record
+    return insertDeviceStatus(pumpStatus, automaticMode);
   }
+}
+
+// Insert device status as fallback if update fails
+bool insertDeviceStatus(bool pumpStatus, bool automaticMode) {
+  Serial.println("Trying to insert device status instead of update...");
   
-  http.end();
-  return success;
+  HTTPClient http;
+  String url = String(supabaseUrl) + "/rest/v1/device_status";
+  http.begin(url);
+  http.addHeader("apikey", supabaseKey);
+  http.addHeader("Authorization", "Bearer " + getAuthToken());
+  http.addHeader("Content-Type", "application/json");
+  http.addHeader("Prefer", "return=minimal");
+  
+  // Set timeout to prevent hanging
+  http.setTimeout(5000);
+  
+  // Create JSON payload
+  DynamicJsonDocument doc(256);
+  doc["device_id"] = deviceId;
+  doc["pump_status"] = pumpStatus;
+  doc["automatic_mode"] = automaticMode;
+  doc["user_id"] = "2930efc2-0327-47db-9f0b-27901d2bc272"; // Admin user ID
+  
+  String jsonPayload;
+  serializeJson(doc, jsonPayload);
+  
+  Serial.print("Insert device status payload: ");
+  Serial.println(jsonPayload);
+  
+  int httpResponseCode = http.POST(jsonPayload);
+  
+  if (httpResponseCode >= 200 && httpResponseCode < 300) {
+    Serial.println("Device status insert successful!");
+    http.end();
+    return true;
+  } else {
+    Serial.print("Error inserting device status. HTTP Response code: ");
+    Serial.println(httpResponseCode);
+    Serial.print("Error response: ");
+    Serial.println(http.getString());
+    http.end();
+    return false;
+  }
 }
 
 // Check for control commands from Supabase
@@ -183,12 +224,23 @@ ControlCommand checkForCommands() {
   http.begin(url);
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + getAuthToken());
+  // Add caching headers to improve performance
+  http.addHeader("Cache-Control", "no-cache");
+  http.addHeader("Prefer", "return=minimal");
+  
+  Serial.print("Command URL: ");
+  Serial.println(url);
+  
+  // Set timeout to 5 seconds for faster response if server is slow
+  http.setTimeout(5000);
   
   int httpResponseCode = http.GET();
   
   if (httpResponseCode >= 200 && httpResponseCode < 300) {
     String response = http.getString();
     Serial.println("HTTP Response code: " + String(httpResponseCode));
+    Serial.print("Command response: ");
+    Serial.println(response);
     
     // Parse JSON response
     DynamicJsonDocument doc(1024);
@@ -199,6 +251,10 @@ ControlCommand checkForCommands() {
       JsonObject jsonCommand = doc[0];
       command.id = jsonCommand["id"].as<String>();
       command.pumpControl = jsonCommand["pump_control"].as<bool>();
+      Serial.print("Found command ID: ");
+      Serial.println(command.id);
+      Serial.print("Pump control value: ");
+      Serial.println(command.pumpControl ? "ON" : "OFF");
       command.automaticMode = jsonCommand["automatic_mode"].as<bool>();
       command.valid = true;
       
@@ -238,6 +294,8 @@ bool markCommandAsExecuted(String commandId) {
   }
   
   Serial.println("Marking command as executed...");
+  Serial.print("Command ID: ");
+  Serial.println(commandId);
   
   // Create JSON payload
   DynamicJsonDocument doc(256);
@@ -246,6 +304,8 @@ bool markCommandAsExecuted(String commandId) {
   
   String jsonPayload;
   serializeJson(doc, jsonPayload);
+  Serial.print("JSON Payload: ");
+  Serial.println(jsonPayload);
   
   // Send HTTP PATCH request to Supabase
   HTTPClient http;
@@ -254,6 +314,10 @@ bool markCommandAsExecuted(String commandId) {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + getAuthToken());
+  http.addHeader("Prefer", "return=minimal");
+  
+  Serial.print("PATCH URL: ");
+  Serial.println(url);
   
   int httpResponseCode = http.PATCH(jsonPayload);
   bool success = false;

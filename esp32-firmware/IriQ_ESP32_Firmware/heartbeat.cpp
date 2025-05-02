@@ -32,7 +32,8 @@ bool sendHeartbeat() {
   // Create JSON payload
   DynamicJsonDocument doc(1024);
   doc["device_id"] = deviceId;
-  doc["timestamp"] = getISOTime();
+  doc["last_seen"] = getISOTime();
+  doc["status"] = "active";
   
   String jsonPayload;
   serializeJson(doc, jsonPayload);
@@ -43,7 +44,7 @@ bool sendHeartbeat() {
   http.addHeader("Content-Type", "application/json");
   http.addHeader("apikey", supabaseKey);
   http.addHeader("Authorization", "Bearer " + getAuthToken());
-  http.addHeader("Prefer", "resolution=merge-duplicates");
+  http.addHeader("Prefer", "return=minimal");
   
   int httpResponseCode = http.POST(jsonPayload);
   bool success = false;

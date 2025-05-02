@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <defs>
+    <linearGradient id="gradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7AD63D" />
+      <stop offset="100%" stop-color="#5fb82f" />
+    </linearGradient>
+  </defs>
+  <g>
+    <path d="M100,20 C130,20 155,45 155,75 C155,105 130,130 100,130 C70,130 45,105 45,75 C45,45 70,20 100,20 Z" fill="url(#gradient)" />
+    <path d="M100,40 C120,40 135,55 135,75 C135,95 120,110 100,110 C80,110 65,95 65,75 C65,55 80,40 100,40 Z" fill="#ffffff" />
+    <path d="M100,50 C115,50 125,60 125,75 C125,90 115,100 100,100 C85,100 75,90 75,75 C75,60 85,50 100,50 Z" fill="url(#gradient)" />
+    <path d="M100,130 L120,180 L80,180 Z" fill="url(#gradient)" />
+    <circle cx="100" cy="75" r="10" fill="#ffffff" />
+  </g>
+  <text x="50" y="165" font-family="Arial, sans-serif" font-weight="bold" font-size="24" fill="#002E1F">IriQ</text>
+</svg>

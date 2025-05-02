@@ -74,6 +74,7 @@ export default function HistoryView({ compact = false }: { compact?: boolean } =
         
         if (fetchError) throw fetchError
         
+        console.log('Fetched historical data:', data?.length || 0, 'readings')
         setReadings(data as SensorReading[])
       } catch (err) {
         console.error('Error fetching historical data:', err)
@@ -84,6 +85,33 @@ export default function HistoryView({ compact = false }: { compact?: boolean } =
     }
 
     fetchHistoricalData()
+    
+    // Set up real-time subscription for new readings
+    const readingsSubscription = supabase
+      .channel('history_readings_changes')
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'sensor_readings',
+        filter: `device_id=eq.esp32_device_1`
+      }, (payload) => {
+        console.log('New reading for history:', payload.new)
+        // Add the new reading to our existing readings
+        setReadings(prev => [...prev, payload.new as SensorReading].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+        ))
+      })
+      .subscribe()
+    
+    // Add a polling fallback for reliability
+    const pollingInterval = setInterval(() => {
+      fetchHistoricalData();
+    }, 30000); // Poll every 30 seconds to keep chart updated
+    
+    return () => {
+      readingsSubscription.unsubscribe();
+      clearInterval(pollingInterval);
+    };
   }, [user, dateRange, startDate, endDate])
 
   const handleDateRangeChange = (range: DateRange) => {
@@ -309,63 +337,107 @@ export default function HistoryView({ compact = false }: { compact?: boolean } =
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="bg-white rounded-lg p-4 shadow-sm border border-[#F6F8ED] h-80"
+            className="bg-white rounded-lg p-4 shadow-sm border border-[#F6F8ED] flex flex-col"
+            style={{ height: '350px', minHeight: '300px' }}
           >
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart
-                data={chartData}
-                margin={{ top: 10, right: 30, left: 10, bottom: 10 }}
-              >
-                <defs>
-                  <linearGradient id="moistureGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#7AD63D" stopOpacity={0.8}/>
-                    <stop offset="95%" stopColor="#7AD63D" stopOpacity={0.1}/>
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F6F8ED" />
-                <XAxis 
-                  dataKey="time" 
-                  tick={{ fontSize: 12, fill: '#002E1F' }}
-                  tickFormatter={(value) => {
-                    // Simplify the date format for display
-                    const date = new Date(value)
-                    return date.toLocaleDateString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })
-                  }}
-                  stroke="#002E1F"
-                />
-                <YAxis 
-                  domain={[0, 100]} 
-                  tick={{ fontSize: 12, fill: '#002E1F' }}
-                  label={{ 
-                    value: 'Moisture (%)', 
-                    angle: -90, 
-                    position: 'insideLeft',
-                    style: { textAnchor: 'middle', fill: '#002E1F' }
-                  }}
-                  stroke="#002E1F"
-                />
-                <Tooltip 
-                  formatter={(value: number) => [`${value}%`, 'Moisture']}
-                  labelFormatter={(label) => `Time: ${label}`}
-                  contentStyle={{ backgroundColor: 'white', borderRadius: '8px', border: '1px solid #F6F8ED' }}
-                />
-                <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                <Area
-                  type="monotone"
-                  dataKey="moisture"
-                  stroke="#7AD63D"
-                  strokeWidth={2}
-                  fillOpacity={1}
-                  fill="url(#moistureGradient)"
-                  activeDot={{ r: 8, strokeWidth: 0, fill: '#002E1F' }}
-                />
-              </AreaChart>
-            </ResponsiveContainer>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <div className="w-6 h-6 rounded-full bg-[#7AD63D]/20 flex items-center justify-center mr-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-[#7AD63D]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium text-[#002E1F]/70">Moisture Trends</span>
+              </div>
+              <div className="text-xs font-medium px-2 py-1 rounded-full bg-[#7AD63D]/10 text-[#7AD63D]">
+                {chartData.length > 0 ? `${chartData.length} readings` : 'No data'}
+              </div>
+            </div>
+            <div className="flex-grow h-full" style={{ minHeight: '250px' }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart
+                  data={chartData}
+                  margin={{ top: 10, right: 10, left: 0, bottom: 10 }}
+                >
+                  <defs>
+                    <linearGradient id="moistureGradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#7AD63D" stopOpacity={0.8}/>
+                      <stop offset="95%" stopColor="#7AD63D" stopOpacity={0.1}/>
+                    </linearGradient>
+                    <filter id="shadow" x="-2" y="-2" width="104%" height="104%">
+                      <feOffset result="offOut" in="SourceAlpha" dx="2" dy="2" />
+                      <feGaussianBlur result="blurOut" in="offOut" stdDeviation="2" />
+                      <feBlend in="SourceGraphic" in2="blurOut" mode="normal" />
+                    </filter>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F6F8ED" opacity={0.4} vertical={false} />
+                  <XAxis 
+                    dataKey="time" 
+                    tick={{ fontSize: 10, fill: '#002E1F' }}
+                    tickFormatter={(value) => {
+                      // Simplify the date format for display
+                      const date = new Date(value)
+                      return date.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: 'numeric'
+                      })
+                    }}
+                    stroke="#002E1F"
+                    height={30}
+                    minTickGap={20}
+                    axisLine={{ stroke: '#E2E8F0' }}
+                  />
+                  <YAxis 
+                    domain={[0, 100]} 
+                    tick={{ fontSize: 11, fill: '#002E1F' }}
+                    tickFormatter={(value) => `${value}%`}
+                    width={45}
+                    stroke="#002E1F"
+                    axisLine={{ stroke: '#E2E8F0' }}
+                    tickLine={{ stroke: '#E2E8F0' }}
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [`${value}%`, 'Moisture']}
+                    labelFormatter={(label) => {
+                      const date = new Date(label)
+                      return date.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })
+                    }}
+                    contentStyle={{ 
+                      backgroundColor: 'white', 
+                      borderRadius: '8px', 
+                      border: '1px solid #F6F8ED',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
+                      padding: '8px 12px',
+                      fontSize: '12px'
+                    }}
+                    cursor={{ stroke: '#7AD63D', strokeWidth: 1, strokeDasharray: '5 5' }}
+                  />
+                  <Legend 
+                    wrapperStyle={{ paddingTop: '5px', fontSize: '11px' }} 
+                    iconType="circle"
+                    iconSize={8}
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="moisture"
+                    stroke="#7AD63D"
+                    strokeWidth={3}
+                    fillOpacity={1}
+                    fill="url(#moistureGradient)"
+                    activeDot={{ r: 8, strokeWidth: 2, fill: '#7AD63D', stroke: '#002E1F' }}
+                    animationDuration={1500}
+                    isAnimationActive={true}
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
           </motion.div>
         )}
         </div>

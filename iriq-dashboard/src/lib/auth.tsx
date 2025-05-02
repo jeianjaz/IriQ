@@ -46,14 +46,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             .eq('id', session.user.id)
             .single()
 
-          if (profileError) throw profileError
-
-          setUser({
-            id: session.user.id,
-            email: session.user.email!,
-            role: data.role,
-            full_name: data.full_name
-          })
+          if (profileError) {
+            console.log('Initial profile check: Profile not found, using user metadata instead')
+            // Use metadata from the user object as fallback
+            const userData = session.user.user_metadata
+            
+            setUser({
+              id: session.user.id,
+              email: session.user.email!,
+              role: userData?.role || 'user',
+              full_name: userData?.full_name || ''
+            })
+          } else {
+            setUser({
+              id: session.user.id,
+              email: session.user.email!,
+              role: data.role || 'user',
+              full_name: data.full_name
+            })
+          }
         }
       } catch (error) {
         console.error('Error getting session:', error)
@@ -81,8 +92,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               .single()
 
             if (error) {
-              console.error('Error fetching profile:', error)
-              setUser(null)
+              console.log('Profile not found, using user metadata instead')
+              // Use metadata from the user object as fallback
+              const userData = session.user.user_metadata
+              
+              setUser({
+                id: session.user.id,
+                email: session.user.email!,
+                role: userData?.role || 'user',
+                full_name: userData?.full_name || ''
+              })
               return
             }
 
@@ -90,7 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setUser({
               id: session.user.id,
               email: session.user.email!,
-              role: data.role,
+              role: data.role || 'user',
               full_name: data.full_name
             })
           } catch (err) {
@@ -113,6 +132,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signIn = async (email: string, password: string) => {
     try {
       console.log('Attempting to sign in with:', email)
+      
+      // We'll skip user existence check as it requires admin privileges
+      // Just log that we're attempting to sign in
+      console.log('Proceeding with login attempt for:', email)
+      
+      // Attempt to sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -122,6 +147,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       
       if (error) {
         console.error('Sign in error:', error)
+        
+        // Handle specific error cases
+        if (error.message.includes('Invalid login credentials')) {
+          console.log('This could be due to unconfirmed email or incorrect password')
+        }
       } else if (data.user) {
         console.log('User signed in successfully:', data.user.id)
       }
@@ -135,29 +165,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName: string) => {
     try {
+      console.log('Starting signup process for:', email)
+      
+      // Create the auth user with metadata and auto-confirm for development
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          data: {
+            full_name: fullName,
+            role: 'user', // Store role in user metadata
+          },
+          // For development, we'll auto-confirm users
+          emailRedirectTo: `${window.location.origin}/login`,
+        },
       })
 
-      if (error) return { error }
+      if (error) {
+        console.error('Signup error:', error)
+        return { error }
+      }
 
       if (data.user) {
-        // Create a profile entry with default role 'user'
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .insert({
-            id: data.user.id,
+        console.log('User created successfully:', data.user.id, 'Session:', data.session ? 'Yes' : 'No')
+        
+        // For development purposes, let's try to immediately sign in the user
+        // This is a workaround for the email confirmation requirement
+        if (!data.session) {
+          console.log('Attempting immediate login for development...')
+          const { error: signInError } = await supabase.auth.signInWithPassword({
             email,
-            full_name: fullName,
-            role: 'user',
+            password
           })
-
-        if (profileError) return { error: profileError }
+          
+          if (signInError) {
+            console.log('Immediate login failed, user will need to verify email:', signInError)
+          } else {
+            console.log('Immediate login successful for development')
+          }
+        }
       }
 
       return { error: null }
     } catch (error) {
+      console.error('Signup exception:', error)
       return { error: error as Error }
     }
   }
@@ -169,11 +220,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const resetPassword = async (email: string) => {
     try {
+      console.log('Requesting password reset for:', email)
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
+      
+      if (error) {
+        console.error('Password reset error:', error)
+      } else {
+        console.log('Password reset email sent successfully')
+      }
+      
       return { error }
     } catch (error) {
+      console.error('Exception during password reset:', error)
       return { error: error as Error }
     }
   }

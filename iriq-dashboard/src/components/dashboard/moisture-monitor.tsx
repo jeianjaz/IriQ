@@ -49,26 +49,43 @@ export default function MoistureMonitor({ compact = false }: { compact?: boolean
 
     fetchMoistureData()
 
-    // Set up real-time subscription for ESP32 device
-    const subscription = supabase
-      .channel('sensor_readings_changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'sensor_readings',
-          filter: `device_id=eq.esp32_device_1`
-        },
-        (payload) => {
-          // Update the state with the new reading
-          setMoistureData(payload.new as MoistureData)
-        }
-      )
+    // Set up real-time subscription for moisture readings with optimized settings
+    const moistureSubscription = supabase
+      .channel('moisture_readings')
+      .on('postgres_changes', { 
+        event: '*', // Listen for all events (INSERT, UPDATE, DELETE)
+        schema: 'public', 
+        table: 'sensor_readings',
+        filter: `device_id=eq.esp32_device_1`
+      }, (payload) => {
+        console.log('Received moisture update:', payload.new);
+        setMoistureData(payload.new as MoistureData)
+      })
       .subscribe()
+      
+    // Add a polling fallback for reliability with increased frequency
+    const pollingInterval = setInterval(async () => {
+      try {
+        const { data, error } = await supabase
+          .from('sensor_readings')
+          .select('*')
+          .eq('device_id', 'esp32_device_1')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single()
+        
+        if (!error && data) {
+          console.log('Polling moisture update:', data);
+          setMoistureData(data as MoistureData)
+        }
+      } catch (err) {
+        // Silent fail for polling - subscription is primary method
+      }
+    }, 3000) // Poll every 3 seconds for faster updates
 
     return () => {
-      subscription.unsubscribe()
+      moistureSubscription.unsubscribe()
+      clearInterval(pollingInterval)
     }
   }, [user])
 
