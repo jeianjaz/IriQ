@@ -1,6 +1,6 @@
 # IriQ Smart Irrigation System
 
-![IriQ Logo](./iriq-dashboard/public/iriqss.png)
+![IriQ Logo](./iriq-dashboard/public/SSIRIQ.png)
 
 IriQ is a comprehensive smart irrigation solution that combines ESP32 microcontrollers, soil moisture sensors, and a modern web dashboard to optimize water usage and improve crop yields through precision agriculture.
 
