@@ -4,9 +4,10 @@ import { Database } from './database.types'
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
 
-// Log the URL and key to make sure they're being loaded correctly
-console.log('Supabase URL:', supabaseUrl)
-console.log('Supabase Key length:', supabaseAnonKey ? supabaseAnonKey.length : 0)
+// Only log connection status in development, not the actual credentials
+if (process.env.NODE_ENV === 'development') {
+  console.log('Supabase client initialized')
+}
 
 // Create the Supabase client with explicit options
 export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {

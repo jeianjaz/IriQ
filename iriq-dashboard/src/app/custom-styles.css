@@ -1,0 +1,12 @@
+/* Custom styles to reduce gradient animation intensity */
+.animate-gradient-slow {
+  animation-duration: 20s !important; /* Slower animation */
+  animation-timing-function: ease-in-out !important;
+}
+
+/* Softer gradient colors */
+.bg-gradient-radial.from-\[\#c8e8a8\].via-\[\#e0f3d1\].to-\[\#f0f9eb\] {
+  --tw-gradient-from: #e0f3d1 !important;
+  --tw-gradient-via: #eaf7e2 !important;
+  --tw-gradient-to: #f7fcf3 !important;
+}

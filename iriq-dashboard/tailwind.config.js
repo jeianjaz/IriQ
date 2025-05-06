@@ -16,7 +16,8 @@ module.exports = {
         'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
       },
       animation: {
-        'gradient-slow': 'gradient 8s ease infinite',
+        'gradient-slow': 'gradient 15s ease infinite',
+        'gradient-subtle': 'gradient 20s ease infinite',
         'text-slide-up': 'slideUp 0.9s ease-in-out',
         'text-slide-down': 'slideDown 0.9s ease-in-out',
         'word-change': 'wordChange 1.2s ease-in-out',
@@ -30,7 +31,7 @@ module.exports = {
       keyframes: {
         gradient: {
           '0%': { backgroundSize: '100% 100%', backgroundPosition: '0% 0%' },
-          '50%': { backgroundSize: '200% 200%', backgroundPosition: '100% 100%' },
+          '50%': { backgroundSize: '150% 150%', backgroundPosition: '100% 100%' },
           '100%': { backgroundSize: '100% 100%', backgroundPosition: '0% 0%' },
         },
         slideUp: {

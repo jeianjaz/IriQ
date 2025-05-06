@@ -1,0 +1,54 @@
+# Dependencies
+node_modules
+.pnp
+.pnp.js
+
+# Testing
+coverage
+
+# Next.js
+.next/
+out/
+build
+dist
+
+# Production
+build
+
+# Misc
+.DS_Store
+*.pem
+
+# Debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Local env files
+.env*.local
+.env
+
+# Vercel
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# ESP32 Firmware sensitive files
+esp32-firmware/IriQ_ESP32_Firmware/config.h
+esp32-firmware/IriQ_ESP32_Firmware/secrets.h
+
+# IDE files
+.vscode/
+.idea/
+
+# Logs
+logs
+*.log
+
+# Build artifacts
+*.o
+*.elf
+*.bin
+*.hex
